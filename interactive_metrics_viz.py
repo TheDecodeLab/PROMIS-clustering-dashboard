@@ -1525,38 +1525,50 @@ def create_stratified_pairwise_table(
     return result_df
 
 
-def load_feature_importance_data(results_path: str) -> pd.DataFrame:
+def load_feature_importance_data(results_path: str = None) -> pd.DataFrame:
     """
-    Load feature importance data from CSV files in the results directory.
+    Load feature importance data from optimized Parquet file or CSV files.
     
     Args:
-        results_path: Path to results directory
+        results_path: Path to results directory (optional, will check optimized file first)
         
     Returns:
         DataFrame with feature importance data
     """
-    results_dir = Path(results_path)
-    fi_files = list(results_dir.glob("**/feature_importance_results_*.csv"))
-    
-    if not fi_files:
-        return pd.DataFrame()
-    
-    frames = []
-    for fi_file in fi_files:
+    # First, check for optimized Parquet file in the dashboard results directory
+    dashboard_results = Path(__file__).parent / "results" / "feature_importance_data.parquet"
+    if dashboard_results.exists():
         try:
-            df = pd.read_csv(fi_file)
-            # Extract metadata from filename or columns
-            if 'label_file' in df.columns:
-                frames.append(df)
+            fi_df = pd.read_parquet(dashboard_results)
+            if not fi_df.empty:
+                return fi_df
         except Exception as e:
-            # Silently skip files that can't be read
-            continue
+            # If Parquet fails, fall back to CSV loading
+            pass
     
-    if not frames:
-        return pd.DataFrame()
+    # Fall back to loading from CSV files in the results directory
+    if results_path:
+        results_dir = Path(results_path)
+        if results_dir.exists():
+            fi_files = list(results_dir.glob("**/feature_importance_results_*.csv"))
+            
+            if fi_files:
+                frames = []
+                for fi_file in fi_files:
+                    try:
+                        df = pd.read_csv(fi_file)
+                        # Extract metadata from filename or columns
+                        if 'label_file' in df.columns:
+                            frames.append(df)
+                    except Exception as e:
+                        # Silently skip files that can't be read
+                        continue
+                
+                if frames:
+                    fi_df = pd.concat(frames, ignore_index=True)
+                    return fi_df
     
-    fi_df = pd.concat(frames, ignore_index=True)
-    return fi_df
+    return pd.DataFrame()
 
 
 def create_feature_importance_comparison(
@@ -3737,6 +3749,7 @@ def main():
                         st.markdown(f"Comparison of top-10 feature importances between {strat_labels[0]} and {strat_labels[1]}.")
                         
                         try:
+                            # Load feature importance (checks optimized file first, then results_path)
                             fi_df = load_feature_importance_data(results_path)
                             
                             if fi_df.empty:
@@ -4084,6 +4097,7 @@ def main():
                         st.markdown("Overall feature importance across all selected configurations.")
                         
                         try:
+                            # Load feature importance (checks optimized file first, then results_path)
                             fi_df = load_feature_importance_data(results_path)
                             
                             if fi_df.empty:
