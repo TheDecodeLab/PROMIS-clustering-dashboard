@@ -213,6 +213,10 @@ __marimo__/
 # Uncomment if dashboard_data.parquet is > 100MB
 # results/*.parquet
 
+# Feature importance files are typically very large (>1GB)
+# Keep them local but don't commit to git
+results/feature_importance_data.parquet
+
 # IDE
 .vscode/
 .idea/
